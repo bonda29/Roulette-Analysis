@@ -42,7 +42,7 @@ public class Main {
         boolean[] changeBetColorAfterWinOptions = {true, false};
 
         // Number of simulations to run for each parameter combination
-        int simulationsPerCombination = 1000;
+        int simulationsPerCombination = 10;
 
         List<SimulationResult> results = new ArrayList<>();
 

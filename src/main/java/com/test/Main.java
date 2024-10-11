@@ -81,14 +81,12 @@ public class Main {
             }
         }
 
-        // Wait for all simulations to complete and collect results
         for (Future<List<SimulationResult>> future : futures) {
             results.addAll(future.get());
         }
-
         executorService.shutdown();
 
-        analyzeResultsCsv(results);
+        analyzeResultsCsv(results); // change to analyzeResultsConsole(results) to print to console
     }
 
     public static SimulationResult runSimulation(double initialBalance, double baseBetAmount, double targetProfit,

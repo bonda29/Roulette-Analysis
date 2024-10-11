@@ -1,5 +1,9 @@
 package com.test;
 
+import com.opencsv.CSVWriter;
+import com.opencsv.bean.ColumnPositionMappingStrategy;
+import com.opencsv.bean.StatefulBeanToCsv;
+import com.opencsv.bean.StatefulBeanToCsvBuilder;
 import com.test.models.Bet;
 import com.test.models.RouletteNumber;
 import com.test.models.SimulationResult;
@@ -11,69 +15,66 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.util.*;
-import java.util.concurrent.*;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+
+import static com.test.models.enums.Color.BLACK;
+import static com.test.models.enums.Color.RED;
 
 @Slf4j
 public class Main {
     public static void main(String[] args) throws InterruptedException, ExecutionException {
         double initialBalance = 500;
+
         double[] baseBetAmounts = {1, 2, 5};
-        double[] targetProfits = {50, 100, 200};
-        double[] stopLossLimits = {100, 200, 300};
+        double[] targetBalanceMultipliers = {1.2, 1.3, 1.4, 1.5, 2}; // As multiples of initial balance
+        double[] stopLossLimitMultipliers = {1, 1.1, 1.2}; // As multiples of initial balance
         double[] maxBetPercentages = {0.25, 0.5, 0.75}; // As fractions of initial balance
-        int[] maxRoundsOptions = {100, 500, 1000};
-        Color[] betColors = {Color.RED, Color.BLACK};
+        int[] maxRoundsOptions = {100, 200, 500};
+        boolean[] changeBetColorAfterWinOptions = {true, false};
 
         // Number of simulations to run for each parameter combination
         int simulationsPerCombination = 1000;
 
         List<SimulationResult> results = new ArrayList<>();
 
-        int totalCombinations = baseBetAmounts.length * targetProfits.length * stopLossLimits.length
-                * maxBetPercentages.length * maxRoundsOptions.length * betColors.length;
-
-        int combinationCounter = 1;
-
         // Use for parallel execution
         ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
         List<Future<List<SimulationResult>>> futures = new ArrayList<>();
-
         for (double baseBetAmount : baseBetAmounts) {
-            for (double targetProfit : targetProfits) {
-                for (double stopLossLimit : stopLossLimits) {
+            for (double targetBalanceMultiplier : targetBalanceMultipliers) {
+                for (double stopLossLimitMultiplier : stopLossLimitMultipliers) {
                     for (double maxBetPercentage : maxBetPercentages) {
                         for (int maxRounds : maxRoundsOptions) {
-                            for (Color betColor : betColors) {
-                                final double bbAmount = baseBetAmount;
-                                final double tProfit = targetProfit;
-                                final double sLossLimit = stopLossLimit;
-                                final double mBetPercentage = maxBetPercentage;
-                                final int mRounds = maxRounds;
-                                final Color bColor = betColor;
+                            for (boolean changeBetColorAfterWin : changeBetColorAfterWinOptions) {
+                                final double targetBalance = initialBalance * targetBalanceMultiplier;
+                                final double stopLossLimit = initialBalance * stopLossLimitMultiplier;
 
                                 futures.add(executorService.submit(() -> {
                                     List<SimulationResult> simulationResults = new ArrayList<>();
                                     for (int i = 0; i < simulationsPerCombination; i++) {
                                         SimulationResult result = runSimulation(
                                                 initialBalance,
-                                                bbAmount,
-                                                tProfit,
-                                                sLossLimit,
-                                                mBetPercentage,
-                                                mRounds,
-                                                bColor,
-                                                false // Set to true if you want detailed logs
+                                                baseBetAmount,
+                                                targetBalance,
+                                                stopLossLimit,
+                                                maxBetPercentage,
+                                                maxRounds,
+                                                changeBetColorAfterWin
                                         );
                                         simulationResults.add(result);
                                     }
                                     return simulationResults;
                                 }));
-
-                                System.out.println("Submitted simulation batch " + combinationCounter + " of " + totalCombinations);
-                                combinationCounter++;
                             }
                         }
                     }
@@ -89,24 +90,29 @@ public class Main {
         analyzeResultsCsv(results); // change to analyzeResultsConsole(results) to print to console
     }
 
-    public static SimulationResult runSimulation(double initialBalance, double baseBetAmount, double targetProfit,
+    public static SimulationResult runSimulation(double initialBalance, double baseBetAmount, double targetBalance,
                                                  double stopLossLimit, double maxBetPercentage, int maxRounds,
-                                                 Color betColor, boolean verbose) {
+                                                 boolean changeBetColorAfterWin) {
         RouletteService rouletteService = RouletteService.builder()
                 .wheel(RouletteService.createWheel())
                 .random(new Random())
                 .build();
 
+        Color betColor = BLACK;
+
         double balance = initialBalance;
+
         double betAmount = baseBetAmount;
         double maxBetLimit = initialBalance * maxBetPercentage;
+
         double totalProfit = 0;
         double totalLoss = 0;
-        int round = 0;
+
         boolean targetReached = false;
         boolean stopLossReached = false;
         boolean outOfMoney = false;
 
+        int round = 0;
         while (balance >= betAmount && round < maxRounds && !targetReached && !stopLossReached) {
             Bet bet = Bet.builder()
                     .type(BetType.COLOR)
@@ -114,30 +120,23 @@ public class Main {
                     .bet(betColor)
                     .build();
 
-            RouletteNumber result = rouletteService.spinWheel();
-            if (verbose) {
-                System.out.println("Round " + (round + 1) + ": The ball landed on " + result.getNumber() + " " + result.getColor());
-            }
+            balance -= betAmount; // place bet
 
+            RouletteNumber result = rouletteService.spinWheel();
             double payout = rouletteService.evaluateBet(bet, result);
 
-            balance -= betAmount;
             if (payout > 0) {
                 balance += payout;
                 totalProfit += payout - betAmount;
-                if (verbose) {
-                    System.out.println("Bet on " + bet.getBet() + " wins! Payout: $" + payout);
-                    System.out.println("Balance: $" + balance);
-                }
 
-                // Reset bet amount to base
+                // Reset bet amount
                 betAmount = baseBetAmount;
+
+                if (changeBetColorAfterWin) {
+                    betColor = betColor == BLACK ? RED : BLACK;
+                }
             } else {
                 totalLoss += betAmount;
-                if (verbose) {
-                    System.out.println("Bet on " + bet.getBet() + " loses.");
-                    System.out.println("Balance: $" + balance);
-                }
 
                 betAmount *= 2;
                 if (betAmount > maxBetLimit) {
@@ -149,7 +148,7 @@ public class Main {
                 }
             }
 
-            if (totalProfit >= targetProfit) {
+            if (balance >= targetBalance) {
                 targetReached = true;
             }
             if (totalLoss >= stopLossLimit) {
@@ -166,12 +165,12 @@ public class Main {
         return SimulationResult.builder()
                 .initialBalance(initialBalance)
                 .baseBetAmount(baseBetAmount)
-                .targetProfit(targetProfit)
-                .stopLossLimit(stopLossLimit)
                 .maxBetPercentage(maxBetPercentage)
                 .maxRounds(maxRounds)
-                .betColor(betColor)
+                .targetBalance(targetBalance)
+                .stopLossLimit(stopLossLimit)
                 .balance(balance)
+                .profit(balance - initialBalance)
                 .totalProfit(totalProfit)
                 .totalLoss(totalLoss)
                 .roundsPlayed(round)
@@ -184,7 +183,7 @@ public class Main {
     public static void analyzeResultsConsole(List<SimulationResult> results) {
         // Group results by parameter combinations
         Map<String, List<SimulationResult>> groupedResults = results.stream()
-                .collect(Collectors.groupingBy(SimulationResult::getParameterCombinationKey));
+                .collect(Collectors.groupingBy(SimulationResult::toString));
 
         for (Map.Entry<String, List<SimulationResult>> entry : groupedResults.entrySet()) {
             String key = entry.getKey();
@@ -207,35 +206,28 @@ public class Main {
 
     @SneakyThrows
     public static void analyzeResultsCsv(List<SimulationResult> results) {
-        String csvFile = "simulation_results.csv";
-        File file = new File(csvFile);
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            try (FileWriter writer = new FileWriter(file)) {
-                writer.append("InitialBalance,BaseBetAmount,TargetProfit,StopLossLimit,MaxBetPercentage,MaxRounds,BetColor,")
-                        .append("FinalBalance,TotalProfit,TotalLoss,RoundsPlayed,TargetReached,StopLossReached,OutOfMoney\n");
+        File csvFile = new File("simulation_results.csv");
+        if (!csvFile.exists()) {
+            csvFile.createNewFile();
+        }
+        try (Writer writer = new FileWriter(csvFile)) {
+            writer.write("InitialBalance,BaseBetAmount,MaxBetPercentage,MaxRounds,TargetBalance,StopLossLimit,Balance,Profit,TotalProfit,TotalLoss,RoundsPlayed,TargetReached,StopLossReached,OutOfMoney\n");
 
-                for (SimulationResult result : results) {
-                    writer.append(String.valueOf(result.getInitialBalance())).append(",")
-                            .append(String.valueOf(result.getBaseBetAmount())).append(",")
-                            .append(String.valueOf(result.getTargetProfit())).append(",")
-                            .append(String.valueOf(result.getStopLossLimit())).append(",")
-                            .append(String.valueOf(result.getMaxBetPercentage())).append(",")
-                            .append(String.valueOf(result.getMaxRounds())).append(",")
-                            .append(result.getBetColor().toString()).append(",")
-                            .append(String.valueOf(result.getBalance())).append(",")
-                            .append(String.valueOf(result.getTotalProfit())).append(",")
-                            .append(String.valueOf(result.getTotalLoss())).append(",")
-                            .append(String.valueOf(result.getRoundsPlayed())).append(",")
-                            .append(String.valueOf(result.isTargetReached())).append(",")
-                            .append(String.valueOf(result.isStopLossReached())).append(",")
-                            .append(String.valueOf(result.isOutOfMoney())).append("\n");
-                }
 
-                System.out.println("Simulation results have been written to " + csvFile);
-            }
+            ColumnPositionMappingStrategy<SimulationResult> strategy = new ColumnPositionMappingStrategy<>();
+            strategy.setType(SimulationResult.class);
+            strategy.setColumnMapping("initialBalance", "baseBetAmount", "maxBetPercentage", "maxRounds", "targetBalance",
+                    "stopLossLimit", "balance", "profit", "totalProfit", "totalLoss", "roundsPlayed",
+                    "targetReached", "stopLossReached", "outOfMoney");
 
-            System.out.println("Simulation results have been written to " + file.getAbsolutePath());
+            StatefulBeanToCsv<SimulationResult> beanToCsv = new StatefulBeanToCsvBuilder<SimulationResult>(writer)
+                    .withMappingStrategy(strategy)
+                    .withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
+                    .build();
+
+            beanToCsv.write(results);
+        }
+
+        System.out.println("Simulation results have been written to " + csvFile.getAbsolutePath());
     }
 }

@@ -9,6 +9,6 @@ import lombok.Data;
 @Builder
 public class Bet {
     private BetType type;
-    private int amount;
+    private double amount;
     private BetOption bet;
 }

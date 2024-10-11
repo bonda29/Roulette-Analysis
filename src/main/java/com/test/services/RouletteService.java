@@ -1,7 +1,7 @@
 package com.test.services;
 
 import com.test.models.Bet;
-import com.test.models.enums.Color;
+import com.test.models.enums.*;
 import com.test.models.RouletteNumber;
 import com.test.models.enums.Number;
 import lombok.Builder;
@@ -23,7 +23,7 @@ public class RouletteService {
     private final List<RouletteNumber> wheel;
     private final Random random;
 
-    private static List<RouletteNumber> createWheel() {
+    public static List<RouletteNumber> createWheel() {
         return IntStream.rangeClosed(0, 36)
                 .mapToObj(i -> {
                     Color color;
@@ -50,76 +50,111 @@ public class RouletteService {
         return wheel.get(index);
     }
 
-    public int evaluateBet(Bet bet, RouletteNumber result) {
+    public double evaluateBet(Bet bet, RouletteNumber result) {
         switch (bet.getType()) {
-            case NUMBER:
-                if (!(bet.getBet() instanceof Number number)) {
+            case NUMBER: {
+                if (!(bet.getBet() instanceof Number betNumber)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
-
-                if (number.getValue() == result.getNumber()) {
+                if (betNumber.getValue() == result.getNumber()) {
                     return bet.getAmount() * 36;
                 }
-
-            case COLOR:
-                if (!(bet.getBet() instanceof Color color)) {
+                break;
+            }
+            case COLOR: {
+                if (!(bet.getBet() instanceof Color betColor)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
-
-                if (color == result.getColor()) {
+                if (betColor == result.getColor()) {
                     return bet.getAmount() * 2;
                 }
+                break;
+            }
+            case ODD_EVEN: {
+                if (result.getNumber() == 0) {
+                    break;
+                }
 
-            case ODD_EVEN:
-                if(!(bet.getBet() instanceof Number number)) {
+                if (!(bet.getBet() instanceof OddEven betValue)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
 
-                boolean isBetEven = number.getValue() % 2 == 0;
                 boolean isResultEven = result.getNumber() % 2 == 0;
-
-                if (isBetEven == isResultEven) {
+                if ((betValue == OddEven.EVEN && isResultEven) || (betValue == OddEven.ODD && !isResultEven)) {
                     return bet.getAmount() * 2;
                 }
 
-            case HIGH_LOW:
-                if(!(bet.getBet() instanceof Number number)) {
+                break;
+            }
+            case HIGH_LOW: {
+                if (result.getNumber() == 0) {
+                    break;
+                }
+
+                if (!(bet.getBet() instanceof HighLow betValue)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
 
-                boolean isBetHigh = number.getValue() > 18;
-                boolean isResultHigh = result.getNumber() > 18;
-
-                if (isBetHigh == isResultHigh) {
+                boolean isResultHigh = result.getNumber() >= 19 && result.getNumber() <= 36;
+                if ((betValue == HighLow.HIGH && isResultHigh) || (betValue == HighLow.LOW && !isResultHigh)) {
                     return bet.getAmount() * 2;
                 }
 
-            case DOZEN:
-                if (!(bet.getBet() instanceof Number number)) {
+                break;
+            }
+            case DOZEN: {
+                if (result.getNumber() == 0) {
+                    break;
+                }
+
+                if (!(bet.getBet() instanceof Dozen betDozen)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
 
-                int dozen = (number.getValue() - 1) / 12;
-                if (result.getNumber() != 0 && dozen == number.getValue()) {
+                int resultDozen = (result.getNumber() - 1) / 12 + 1;
+                if (betDozen.getDozenNumber() == resultDozen) {
                     return bet.getAmount() * 3;
                 }
 
-            case COLUMN:
-                if (!(bet.getBet() instanceof Number number)) {
+                break;
+            }
+            case COLUMN: {
+                if (!(bet.getBet() instanceof Column betColumn)) {
                     throw new IllegalArgumentException("Invalid bet: " + bet.getBet());
                 }
 
-                int column = (number.getValue() - 1) % 3;
-                if (result.getNumber() != 0 && column == number.getValue()) {
+                int resultColumn = ((result.getNumber() - 1) % 3) + 1;
+                if (betColumn.getColumnNumber() == resultColumn) {
                     return bet.getAmount() * 3;
                 }
 
+                break;
+            }
             default:
                 throw new IllegalArgumentException("Invalid bet type: " + bet.getType());
         }
+
+        return 0;
     }
 
     public void playRound(List<Bet> bets) {
+        RouletteNumber result = spinWheel();
 
+        log.info("The ball landed on {} {}", result.getNumber(), result.getColor() != null ? result.getColor() : "");
+
+        double totalPayout = 0;
+        for (Bet bet : bets) {
+            double payout = evaluateBet(bet, result);
+
+            if (payout > 0) {
+                log.info("Bet on {} wins! Payout: {}", bet.getBet(), payout);
+            } else {
+                log.info("Bet on {} loses.", bet.getBet());
+            }
+
+            totalPayout += payout;
+        }
+
+        log.info("Total payout: {}", totalPayout);
     }
 }

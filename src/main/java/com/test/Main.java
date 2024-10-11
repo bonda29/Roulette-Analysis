@@ -1,94 +1,87 @@
 package com.test;
 
-import java.util.Random;
-import java.util.Scanner;
+import com.test.models.Bet;
+import com.test.models.RouletteNumber;
+import com.test.models.enums.BetType;
+import com.test.models.enums.Color;
+import com.test.services.RouletteService;
+import lombok.extern.slf4j.Slf4j;
 
+import java.util.Random;
+
+@Slf4j
 public class Main {
     public static void main(String[] args) {
-        Scanner keyboard = new Scanner(System.in);
-        Random generator = new Random();
-        double total = 500;
-        double amount;
-        int choice, win = 0, lose = 0, spin = 0;
-        int number;
-        int rouletteNum;
-        int result;
-        char response = 'y';
-        int[] resultArr = new int[36];
+        RouletteService rouletteService = RouletteService.builder()
+                .wheel(RouletteService.createWheel())
+                .random(new Random())
+                .build();
 
-        while (response == 'y' || response == 'Y' && total <= 0) {
-            System.out.print("Enter your bet amount: ");
-            amount = keyboard.nextDouble();
-            System.out.print("0 - Even\n1 - Odd\n2 - Number\n");
-            choice = -1;
-            while (choice < 0 || choice > 2) {
-                System.out.print("Place your bet on: ");
-                choice = keyboard.nextInt();
-            }
-            number = 0;
-            if (choice == 2) {
-                while (number < 1 || number > 36) {
-                    System.out.print("Place your bet on number(1-36): ");
-                    number = keyboard.nextInt();
-                }
-            }
-            rouletteNum = generator.nextInt(37);
-            spin++;
-            System.out.println("Roulette number: " + rouletteNum);
+        double balance = 500;
+        double baseBetAmount = 1;
+        double betAmount = baseBetAmount;
+        double maxBetPercentage = 100; // % of initial balance
+        Color betColor = Color.RED;
+        double maxRounds = 1000;
+        double targetProfit = 100;
+        double stopLossLimit = 200;
+        double totalProfit = 0;
+        double totalLoss = 0;
+        double round = 0;
 
-            if (choice == 2) {
-                if (rouletteNum == number)
-                    result = 35;
-                else
-                    result = 0;
+        while (balance >= betAmount && round < maxRounds) {
+            Bet bet = Bet.builder()
+                    .type(BetType.COLOR)
+                    .amount(betAmount)
+                    .bet(betColor)
+                    .build();
+
+            RouletteNumber result = rouletteService.spinWheel();
+//            log.info("Round {}: The ball landed on {} {}", round + 1, result.getNumber(), result.getColor());
+
+            double payout = rouletteService.evaluateBet(bet, result);
+
+            balance -= betAmount;
+            if (payout > 0) {
+                balance += payout;
+                totalProfit += payout - betAmount;
+
+                log.info("Bet on {} wins! Payout: ${}", bet.getBet(), payout);
+                log.info("Balance: ${}", balance);
+
+                betAmount = baseBetAmount;
             } else {
-                if (rouletteNum == 0 || rouletteNum % 2 != choice)
-                    result = 0;
-                else
-                    result = 1;
-            }
+                totalLoss += betAmount;
+                log.info("Bet on {} loses.", bet.getBet());
+                log.info("Balance: ${}", balance);
 
-            //Print out game result, win/lose amount
-            if (result > 0) {
-                System.out.println("Congratulatons!!! You win!");
-                System.out.printf("You have won $%.2f \n", result * amount);
-                System.out.printf("Here's your money back: $%.2f \n",
-                        (result + 1) * amount);
-                total = (result + 1) * amount + total;
-                win++;
-                resultArr[rouletteNum]++;
+                betAmount *= 2;
 
-            } else {
-                System.out.println("You lose. Better luck next time!");
-                System.out.printf("You have lost $%.2f \n",
-                        (result + 1) * amount);
-                total = total - (result + 1) * (amount);
-                lose++;
-                resultArr[rouletteNum]++;
-
-                if (total <= 0) {
-                    break;
+                double maxBetLimit = 500 * maxBetPercentage;
+                if (betAmount > maxBetLimit) {
+                    betAmount = maxBetLimit;
                 }
 
-            }
-
-            //Ask for another game
-            for (int totals = 1; totals < 36; totals++) {
-                if (resultArr[totals] > 0) {
-                    System.out.println("The number " + totals + " won " + resultArr[totals] + " times.");
+                if (betAmount > balance) {
+                    betAmount = balance;
                 }
             }
 
-
-            System.out.println("You hayve $" + total + " remaining.");
-            System.out.println("You have won " + win + " games.");
-            System.out.println("You have lost " + lose + " games.");
-            System.out.println("The wheel has been spun " + spin + " times.");
-            System.out.print("\nWould you like to play another game? (y/n) ");
-            response = keyboard.next().charAt(0);
-
-
+            round++;
         }
 
+        if (balance <= 0) {
+            log.info("You have run out of money.");
+        }
+//        else if (totalProfit >= targetProfit) {
+//            log.info("You have reached your target profit of ${}", totalProfit);
+//        } else if (totalLoss >= stopLossLimit) {
+//            log.info("Stop-loss limit reached. Total loss: ${}", totalLoss);
+//        }
+        else {
+            log.info("Stopped after {} rounds.", round);
+        }
+
+        log.info("Final balance: ${}", balance);
     }
 }

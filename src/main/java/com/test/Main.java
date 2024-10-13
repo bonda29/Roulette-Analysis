@@ -37,7 +37,7 @@ public class Main {
         double[] baseBetAmounts = {1, 2, 5};
         double[] targetBalanceMultipliers = {1.2, 1.3, 1.4, 1.5, 2}; // As multiples of initial balance
         double[] stopLossLimitMultipliers = {1, 1.1, 1.2}; // As multiples of initial balance
-        double[] maxBetPercentages = {0.25, 0.5, 0.75}; // As fractions of initial balance
+        double[] maxBetPercentages = {0.25, 0.5, 0.75, 1}; // As fractions of initial balance
         int[] maxRoundsOptions = {100, 200, 500};
         boolean[] changeBetColorAfterWinOptions = {true, false};
 
@@ -177,6 +177,7 @@ public class Main {
                 .targetReached(targetReached)
                 .stopLossReached(stopLossReached)
                 .outOfMoney(outOfMoney)
+                .changeBetColorAfterWin(changeBetColorAfterWin)
                 .build();
     }
 
@@ -211,14 +212,13 @@ public class Main {
             csvFile.createNewFile();
         }
         try (Writer writer = new FileWriter(csvFile)) {
-            writer.write("InitialBalance,BaseBetAmount,MaxBetPercentage,MaxRounds,TargetBalance,StopLossLimit,Balance,Profit,TotalProfit,TotalLoss,RoundsPlayed,TargetReached,StopLossReached,OutOfMoney\n");
-
+            writer.write("InitialBalance,BaseBetAmount,MaxBetPercentage,MaxRounds,TargetBalance,StopLossLimit,Balance,Profit,TotalProfit,TotalLoss,RoundsPlayed,TargetReached,StopLossReached,OutOfMoney,ChangeColorAfterWin\n");
 
             ColumnPositionMappingStrategy<SimulationResult> strategy = new ColumnPositionMappingStrategy<>();
             strategy.setType(SimulationResult.class);
             strategy.setColumnMapping("initialBalance", "baseBetAmount", "maxBetPercentage", "maxRounds", "targetBalance",
                     "stopLossLimit", "balance", "profit", "totalProfit", "totalLoss", "roundsPlayed",
-                    "targetReached", "stopLossReached", "outOfMoney");
+                    "targetReached", "stopLossReached", "outOfMoney", "changeBetColorAfterWin");
 
             StatefulBeanToCsv<SimulationResult> beanToCsv = new StatefulBeanToCsvBuilder<SimulationResult>(writer)
                     .withMappingStrategy(strategy)

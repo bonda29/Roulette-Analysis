@@ -23,4 +23,5 @@ public class SimulationResult {
     private boolean targetReached;
     private boolean stopLossReached;
     private boolean outOfMoney;
+    private boolean changeBetColorAfterWin;
 }

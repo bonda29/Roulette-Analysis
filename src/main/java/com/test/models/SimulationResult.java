@@ -3,6 +3,11 @@ package com.test.models;
 import lombok.Builder;
 import lombok.Data;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Data
 @Builder
 public class SimulationResult {
@@ -27,4 +32,10 @@ public class SimulationResult {
     private boolean changeBetColorAfterWin;
 
     private int scenarioId;
+
+    public static List<String> getFieldNames() {
+        return Arrays.stream(SimulationResult.class.getDeclaredFields())
+                .map(Field::getName)
+                .toList();
+    }
 }

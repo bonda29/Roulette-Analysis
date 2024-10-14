@@ -1,4 +1,4 @@
-package com.test.services;
+package com.test.utils;
 
 public class RouletteUtils {
     public static double probabilityFail(double initialBalance, double baseBet) {

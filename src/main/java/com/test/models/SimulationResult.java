@@ -6,7 +6,6 @@ import lombok.Data;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -31,7 +30,7 @@ public class SimulationResult {
     private boolean outOfMoney;
     private boolean changeBetColorAfterWin;
 
-    private int scenarioId;
+    private long scenarioId;
 
     public static List<String> getFieldNames() {
         return Arrays.stream(SimulationResult.class.getDeclaredFields())

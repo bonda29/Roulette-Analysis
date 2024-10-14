@@ -3,7 +3,9 @@ package com.test;
 import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.StatefulBeanToCsv;
 import com.opencsv.bean.StatefulBeanToCsvBuilder;
+import com.test.models.SimulationParameters;
 import com.test.models.SimulationResult;
+import com.test.services.SimulationResultAnalyzer;
 import com.test.services.SimulationService;
 import lombok.SneakyThrows;
 
@@ -23,7 +25,7 @@ public class Main {
     public static void main(String[] args) {
         double[] baseBetAmounts = {1, 1.5, 2, 5};
         int[] maxRoundsOptions = {50, 100, 150, 200, 250, 500};
-        boolean[] changeBetColorAfterWinOptions = {true, false};
+        boolean[] changeBetColorAfterWinOptions = {false};
 
         // Number of simulations to run for each parameter combination
         final int simulationsPerCombination = 100;
@@ -35,22 +37,16 @@ public class Main {
         ExecutorService executorService = Executors.newFixedThreadPool(Math.min(totalTasks, Runtime.getRuntime().availableProcessors()));
 
         List<Future<List<SimulationResult>>> futures = new ArrayList<>();
-        int scenarioId = 1;
         for (double baseBetAmount : baseBetAmounts) {
             for (int maxRounds : maxRoundsOptions) {
                 for (boolean changeBetColorAfterWin : changeBetColorAfterWinOptions) {
-                    final int currentScenarioId = scenarioId;
-                    final double initialBalance = calculateInitialBalance(baseBetAmount);
-                    final double estimatedProfit = estimatedProfit(initialBalance, baseBetAmount, maxRounds);
-
                     Callable<List<SimulationResult>> task = () -> {
                         SimulationService simulationService = SimulationService.builder()
-                                .initialBalance(initialBalance)
-                                .baseBetAmount(baseBetAmount)
-                                .estimatedProfit(estimatedProfit)
-                                .maxRounds(maxRounds)
-                                .changeBetColorAfterWin(changeBetColorAfterWin)
-                                .scenarioId(currentScenarioId)
+                                .parameters(SimulationParameters.builder()
+                                        .baseBetAmount(baseBetAmount)
+                                        .maxRounds(maxRounds)
+                                        .changeBetColorAfterWin(changeBetColorAfterWin)
+                                        .build())
                                 .build();
 
                         List<SimulationResult> simulationResults = new ArrayList<>();
@@ -61,7 +57,6 @@ public class Main {
                         return simulationResults;
                     };
 
-                    scenarioId++;
                     futures.add(executorService.submit(task));
                 }
             }
@@ -77,6 +72,11 @@ public class Main {
         }
 
         analyzeResultsCsv(results);
+
+        SimulationResultAnalyzer analyzer = new SimulationResultAnalyzer();
+        analyzer.generateAggregatedReport(results);
+
+        System.out.println("Simulation results have been analyzed");
     }
 
     @SneakyThrows

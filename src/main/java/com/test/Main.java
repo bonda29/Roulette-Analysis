@@ -15,6 +15,8 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.test.utils.RouletteUtils.calculateInitialBalance;
 import static com.test.utils.RouletteUtils.estimatedProfit;
@@ -30,17 +32,17 @@ public class Main {
         // Number of simulations to run for each parameter combination
         final int simulationsPerCombination = 100;
 
-        List<SimulationResult> results = new ArrayList<>();
+        Stream<SimulationResult> results = Stream.empty();
 
         // Use for parallel execution
         int totalTasks = baseBetAmounts.length * maxRoundsOptions.length * changeBetColorAfterWinOptions.length;
         ExecutorService executorService = Executors.newFixedThreadPool(Math.min(totalTasks, Runtime.getRuntime().availableProcessors()));
 
-        List<Future<List<SimulationResult>>> futures = new ArrayList<>();
+        List<Future<Stream<SimulationResult>>> futures = new ArrayList<>();
         for (double baseBetAmount : baseBetAmounts) {
             for (int maxRounds : maxRoundsOptions) {
                 for (boolean changeBetColorAfterWin : changeBetColorAfterWinOptions) {
-                    Callable<List<SimulationResult>> task = () -> {
+                    Callable<Stream<SimulationResult>> task = () -> {
                         SimulationService simulationService = SimulationService.builder()
                                 .parameters(SimulationParameters.builder()
                                         .baseBetAmount(baseBetAmount)
@@ -49,12 +51,8 @@ public class Main {
                                         .build())
                                 .build();
 
-                        List<SimulationResult> simulationResults = new ArrayList<>();
-                        for (int i = 0; i < simulationsPerCombination; i++) {
-                            SimulationResult result = simulationService.runSimulation();
-                            simulationResults.add(result);
-                        }
-                        return simulationResults;
+                        return IntStream.range(0, simulationsPerCombination)
+                                .mapToObj(i -> simulationService.runSimulation());
                     };
 
                     futures.add(executorService.submit(task));
@@ -62,8 +60,8 @@ public class Main {
             }
         }
 
-        for (Future<List<SimulationResult>> future : futures) {
-            results.addAll(future.get());
+        for (Future<Stream<SimulationResult>> future : futures) {
+            results = Stream.concat(results, future.get());
         }
 
         executorService.shutdown();
@@ -71,7 +69,7 @@ public class Main {
             executorService.shutdownNow();
         }
 
-        analyzeResultsCsv(results);
+//        analyzeResultsCsv(results);
 
         SimulationResultAnalyzer analyzer = new SimulationResultAnalyzer();
         analyzer.generateAggregatedReport(results);
@@ -80,7 +78,7 @@ public class Main {
     }
 
     @SneakyThrows
-    private static void analyzeResultsCsv(List<SimulationResult> results) {
+    private static void analyzeResultsCsv(Stream<SimulationResult> results) {
         File csvFile = new File("simulation_results.csv");
         if (!csvFile.exists()) {
             csvFile.createNewFile();

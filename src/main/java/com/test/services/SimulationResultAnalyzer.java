@@ -17,12 +17,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Getter
 public class SimulationResultAnalyzer {
 
     @SneakyThrows
-    public void generateAggregatedReport(List<SimulationResult> simulationResults) {
+    public void generateAggregatedReport(Stream<SimulationResult> simulationResults) {
         File csvFile = new File("simulation_results_analysed.csv");
         if (!csvFile.exists()) {
             csvFile.createNewFile();
@@ -47,8 +48,8 @@ public class SimulationResultAnalyzer {
         System.out.println("Simulation results have been written to " + csvFile.getAbsolutePath());
     }
 
-    private List<AggregatedMetrics> calculateAggregatedMetrics(List<SimulationResult> simulationResults) {
-        Map<Long, List<SimulationResult>> groupedResults = simulationResults.stream()
+    public List<AggregatedMetrics> calculateAggregatedMetrics(Stream<SimulationResult> simulationResults) {
+        Map<Long, List<SimulationResult>> groupedResults = simulationResults
                 .collect(Collectors.groupingBy(SimulationResult::getScenarioId));
 
         List<AggregatedMetrics> metrics = new ArrayList<>();

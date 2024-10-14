@@ -11,7 +11,7 @@ public class SimulationResult {
 
     private int maxRounds;
 
-    private double targetBalance;
+    private double estimatedProfit;
 
     private double balance;
     private double profit;
@@ -25,4 +25,6 @@ public class SimulationResult {
     private boolean targetReached;
     private boolean outOfMoney;
     private boolean changeBetColorAfterWin;
+
+    private int scenarioId;
 }

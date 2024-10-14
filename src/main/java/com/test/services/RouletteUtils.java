@@ -16,6 +16,6 @@ public class RouletteUtils {
     }
 
     public static double calculateInitialBalance(double baseBet) {
-        return baseBet * Math.pow(2, 8);
+        return baseBet * Math.pow(2, 10);
     }
 }

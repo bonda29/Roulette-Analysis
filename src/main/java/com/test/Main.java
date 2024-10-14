@@ -27,8 +27,8 @@ public class Main {
 
     @SneakyThrows
     public static void main(String[] args) {
-        double[] baseBetAmounts = {1, 2, 5};
-        int[] maxRoundsOptions = {100, 200, 500};
+        double[] baseBetAmounts = {1, 1.5, 2, 5};
+        int[] maxRoundsOptions = {50, 100, 150, 200, 250, 500};
         boolean[] changeBetColorAfterWinOptions = {true, false};
 
         // Number of simulations to run for each parameter combination

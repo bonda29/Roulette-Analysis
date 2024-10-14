@@ -30,7 +30,7 @@ public class Main {
         boolean[] changeBetColorAfterWinOptions = {false};
 
         // Number of simulations to run for each parameter combination
-        final int simulationsPerCombination = 100;
+        final int simulationsPerCombination = 10000;
 
         Stream<SimulationResult> results = Stream.empty();
 
